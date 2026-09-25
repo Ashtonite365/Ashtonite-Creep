@@ -1,6 +1,6 @@
 # Ashtonite.Creep
 
-Orion Drift spectator camera for moderators. Hides behind one-sided geo near a tracked player so you can watch and hear them without a visible camera in their face. Falls back to 3rd person when no valid perch exists.
+Orion Drift spectator camera. Hides behind one-sided geo near a tracked player. Falls back to 3rd person when no valid perch exists.
 
 **Version 1.0.0**
 
