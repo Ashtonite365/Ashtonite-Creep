@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.1.0
+
+Added:
+- 32 gravity-aligned search rays (22 down / level, 10 up)
+- Cage traces go through the future camera point and stop the same distance out
+- No 3rd person toggle (can lag on low end devices)
+- Header line for current wall vs floor priority
+
+Fixed:
+- Search not running (search direction helper used flatten too early)
+
 ## 1.0.0
 
 First public build.
