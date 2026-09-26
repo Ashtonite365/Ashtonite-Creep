@@ -3,7 +3,7 @@
 -- @credits to Grok for some help
 metadata = {
 	name = "Ashtonite.Creep",
-	description = "Hide Perch / 3rd-person creep camera",
+	description = "Perch / 3rd-person creep camera",
 	author = "Ashtonite365",
 	defaultKeybind = "",
 }
@@ -26,6 +26,7 @@ local followRadius = 250
 local prioritizeWalls = false
 local perchFollow = cfg("perchFollow", true)
 local onlyThird = cfg("onlyThird", false)
+local noThird = cfg("noThird", false)
 local useExclusions = cfg("useExclusions", true)
 local lastFind = "none"
 local maxRange = cfg("maxRange", 800)
@@ -77,23 +78,6 @@ camera.fieldOfView = fov
 camera.hideNearestHead = false
 camera.showNameTags = showTags
 
-local DIRS = {}
-do
-	local n = 0
-	for x = -1, 1 do
-		for y = -1, 1 do
-			for z = -1, 1 do
-				if not (x == 0 and y == 0 and z == 0) then
-					n += 1
-					local v = Vec3.new(x, y, z)
-					local m = v:length()
-					DIRS[n] = v / m
-				end
-			end
-		end
-	end
-end
-
 local function getAllPlayers()
 	local list = {}
 	local frames = getAllGameData()
@@ -130,6 +114,37 @@ local function flatten(v, up)
 	return d / m
 end
 
+local function searchDirs(up)
+	local dirs = {}
+	local f = flatten(Vec3.forwardVector, up)
+	if f:length() < 0.01 then f = flatten(Vec3.rightVector, up) end
+	if f:length() < 0.01 then f = Vec3.forwardVector else f = f:getSafeNormal() end
+	local function add(v)
+		if v:length() > 0.001 then dirs[#dirs + 1] = v:getSafeNormal() end
+	end
+	local function cone(axis, ang, count)
+		local ca, sa = math.cos(ang), math.sin(ang)
+		local t = axis:cross(up)
+		if t:length() < 0.01 then t = axis:cross(f) end
+		if t:length() < 0.01 then t = Vec3.rightVector end
+		t = t:getSafeNormal()
+		local b = axis:cross(t):getSafeNormal()
+		for i = 1, count do
+			local a = (i - 1) / count * math.pi * 2
+			add(axis * ca + (t * math.cos(a) + b * math.sin(a)) * sa)
+		end
+	end
+	local d2r = math.pi / 180
+	add(-up)
+	cone(-up, 30 * d2r, 8)
+	cone(-up, 60 * d2r, 8)
+	cone(-up, 90 * d2r, 5)
+	add(up)
+	cone(up, 35 * d2r, 8)
+	cone(up, 70 * d2r, 1)
+	return dirs
+end
+
 local function yawOf(fwd, up)
 	local f = flatten(fwd, up)
 	if f:length() < 0.0001 then return 0 end
@@ -144,6 +159,9 @@ local function nameMatch(n, f)
 	return string.find(string.lower(n), string.lower(f), 1, true) ~= nil
 end
 
+local function isVerticalDir(dir, up)
+	return math.abs(dir:dot(up)) >= 0.82
+end
 
 local function isFloorDown(dir, up)
 	return dir:dot(up) <= -0.82
@@ -215,10 +233,8 @@ local function enclosed(center, intoDir, up)
 	local faceHits, otherHits = 0, 0
 	for i = 1, #starts do
 		local s = starts[i]
-		local to = center - s
-		local len = to:length()
-		if len < 4 then return 0 end
-		local hit = camera:castRay(s, s + (to / len) * (len - 3))
+		local far = center + (center - s)
+		local hit = camera:castRay(s, far)
 		if hit.successful then
 			if (s - center):dot(n) < -0.15 then
 				faceHits += 1
@@ -329,8 +345,9 @@ end
 
 local function searchPocket(headPos, up)
 	local hits = {}
-	for i = 1, #DIRS do
-		local dir = DIRS[i]
+	local dirs = searchDirs(up)
+	for i = 1, #dirs do
+		local dir = dirs[i]
 		local before = #hits
 		tryAddHit(hits, headPos, dir)
 		if #hits > before then
@@ -404,7 +421,7 @@ local function startHop(dest, head)
 	hopWait = 0
 	perchPos = dest
 	local up = upVec()
-	hopBelow = dest:dot(up) < head:dot(up)
+	hopBelow = hopFrom:dot(up) < head:dot(up)
 end
 
 local function hopPos(dt)
@@ -596,7 +613,7 @@ function tick(dt)
 	local dist = (camera.position - head):length()
 	local now = os.clock and os.clock() or 0
 
-	if onlyThird then
+	if onlyThird and not noThird then
 		tickThird(dt, player, up)
 		return
 	end
@@ -639,9 +656,14 @@ function tick(dt)
 				applyLook(hopPos(dt) or pocket, head, up, dt)
 				return
 			end
+			if noThird then
+				mode = "Searching"
+				applyLook(camera.position, head, up, dt)
+				return
+			end
 			tickThird(dt, player, up)
 			return
-		elseif mode == "3rd person" then
+		elseif mode == "3rd person" and not noThird then
 			tickThird(dt, player, up)
 			return
 		end
@@ -649,13 +671,15 @@ function tick(dt)
 
 	if mode == "Perch" then
 		applyLook(hopPos(dt) or perchPos or camera.position, head, up, dt)
-	elseif mode == "3rd person" then
+	elseif mode == "3rd person" and not noThird then
 		tickThird(dt, player, up)
+	elseif noThird then
+		applyLook(camera.position, head, up, dt)
 	end
 end
 
 function onGui()
-	Gui.text("Mode: " .. mode .. (onlyThird and " (only 3rd on)" or ""))
+	Gui.text("Mode: " .. mode .. (noThird and " (no 3rd)" or (onlyThird and " (only 3rd on)" or "")))
 	Gui.text("Target: " .. (targetName ~= "" and targetName or "None"))
 	Gui.text("Last perch search: " .. lastFind)
 	local p = camera.position
@@ -668,6 +692,7 @@ function onGui()
 	local ez = e.z or e.Z or 0
 	Gui.text(string.format("Pos  %.1f  %.1f  %.1f", px, py, pz))
 	Gui.text(string.format("Rot  %.1f  %.1f  %.1f", ex, ey, ez))
+	Gui.text("Priority: " .. (prioritizeWalls and "walls" or "floor or ceiling"))
 	Gui.separator()
 	if Gui.beginTabBar("CreepTabs") then
 		if Gui.beginTabItem("Target") then
@@ -720,6 +745,8 @@ function onGui()
 		end
 		if Gui.beginTabItem("3rd person") then
 			onlyThird = Gui.checkbox("Only 3rd person", onlyThird)
+			noThird = Gui.checkbox("No 3rd person", noThird)
+			Gui.text("  Could cause lag on low end devices")
 			orbitMul = Gui.sliderFloat("Orbit rate (x head yaw)", orbitMul, 0.5, 4)
 			safeCone = Gui.sliderFloat("Safe cone", safeCone, 0, 1)
 			minFollow = Gui.sliderFloat("Min follow distance", minFollow, 60, 800)
