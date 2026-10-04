@@ -413,6 +413,7 @@ local function perchBlocked(head)
 	return hit.successful
 end
 
+
 local function startHop(dest, head)
 	hopFrom = camera.position
 	hopTo = dest
