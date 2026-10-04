@@ -1,0 +1,19 @@
+{
+  "$schema": "https://raw.githubusercontent.com/AA-Franz/OD_SpectatorRegistry/refs/heads/main/src/package.schema.json",
+  "name": "ashtonite.creep",
+  "displayName": "Ashtonite.Creep",
+  "version": "1.2.0",
+  "description": "Unofficial perch / 3rd-person creep spectator camera for Orion Drift. Not affiliated with or endorsed by Another Axiom.",
+  "main": "Ashtonite.Creep.luau",
+  "keywords": [
+    "perch",
+    "third-person",
+    "follow",
+    "spectator",
+    "camera"
+  ],
+  "author": "Ashtonite (Ashtonite365)",
+  "license": "GPL-3.0-only",
+  "defaultKeybind": "",
+  "url": "https://github.com/Ashtonite365/Ashtonite-Creep"
+}

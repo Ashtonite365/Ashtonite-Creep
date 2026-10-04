@@ -1,5 +1,18 @@
 # Changelog
 
+## 1.2.0
+
+Changed:
+- Two-step hop checks its path first. It samples rays down along the sideways leg and backwards along the up/down leg,
+  then offsets the hop by the nearest surface found plus the hitbox, so the move stays tucked behind geometry
+- Code comments for the Driftball exclusions, back probe and through-cage rays
+
+Licence:
+- Now licensed under GPL-3.0-only, with NOTICE additional terms (keep the author attribution, mark modified versions)
+- Added LICENSE, NOTICE, a licence/copyright header in the script, and the `package.json` licence field
+- Added the Another Axiom non-affiliation disclaimer and an AI-assistance credit
+- 1.1.0 moved to `archive/1.1.0/`
+
 ## 1.1.0
 
 Added:

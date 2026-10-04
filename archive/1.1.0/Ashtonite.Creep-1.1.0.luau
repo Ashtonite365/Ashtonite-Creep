@@ -1,13 +1,6 @@
--- SPDX-License-Identifier: GPL-3.0-only
--- Copyright (c) 2026 Ashtonite (Ashtonite365)
 -- @name Ashtonite.Creep
--- @version 1.2.0
 -- @author Ashtonite365
--- @credits Developed with AI assistance (Grok Bot agents)
--- Unofficial community spectator camera script for Orion Drift.
--- Licence: GNU GPL v3 only, with the additional terms in NOTICE (keep the author attribution, mark
---   modified versions). See LICENSE and NOTICE. This program comes with ABSOLUTELY NO WARRANTY.
--- This product is not affiliated with Another Axiom Inc. or its videogames Gorilla Tag and Orion Drift and is not endorsed or otherwise sponsored by Another Axiom. Portions of the materials contained herein are property of Another Axiom. ©2025 Another Axiom Inc.
+-- @credits to Grok for some help
 metadata = {
 	name = "Ashtonite.Creep",
 	description = "Perch / 3rd-person creep camera",
@@ -56,7 +49,6 @@ local CAGE_RADIUS = 32
 local EXTRA_ROOM = 8
 local EXTRA_BACK = 7
 
--- Driftball see-through exclusions (two boxes per arena).
 local EXCLUSIONS = {
 	{ name = "Plaza East A", enabled = true, min = Vec3.new(-6239.4, 17443.5, -29132.0), max = Vec3.new(-2647.6, 19674.3, -28965.6) },
 	{ name = "Plaza East B", enabled = true, min = Vec3.new(-4782.1, 16598.3, -29552.2), max = Vec3.new(-4038.0, 20386.7, -29285.6) },
@@ -79,8 +71,6 @@ local hopTo = nil
 local hopPhase = 3
 local hopWait = 0
 local hopBelow = true
-local hopDropDone = false
-local hopBackDone = false
 
 camera.positionSmoothing = 0
 camera.rotationSmoothing = 0
@@ -200,7 +190,6 @@ local function inExclusion(pos)
 	return false
 end
 
--- Barely behind P, shoot back through P. Miss = one-sided. Hit = two-sided / thin.
 local function seeThrough(hitPos, dir)
 	local n = dir:getSafeNormal()
 	local justBehind = hitPos + n * 2
@@ -209,8 +198,6 @@ local function seeThrough(hitPos, dir)
 	return not probe.successful
 end
 
--- 14 through-cage rays. Start on the sphere, pass through the future
--- camera point, stop the same distance out the other side.
 local function enclosed(center, intoDir, up)
 	local n = intoDir:getSafeNormal()
 	local r = n:cross(up)
@@ -426,9 +413,6 @@ local function perchBlocked(head)
 	return hit.successful
 end
 
-local function axisOf(v)
-	return v.x or v.X or 0, v.y or v.Y or 0, v.z or v.Z or 0
-end
 
 local function startHop(dest, head)
 	hopFrom = camera.position
@@ -438,50 +422,6 @@ local function startHop(dest, head)
 	perchPos = dest
 	local up = upVec()
 	hopBelow = hopFrom:dot(up) < head:dot(up)
-	hopDropDone = false
-	hopBackDone = false
-end
-
-local function pathDrop(fromFlat, toFlat, height, up)
-	local delta = toFlat - fromFlat
-	local len = delta:length()
-	local step = HITBOX * 0.25
-	local n = 1
-	if len > step then n = math.floor(len / step) end
-	local reach = HITBOX * 3
-	local best = nil
-	for i = 0, n do
-		local t = (n == 0) and 0 or (i / n)
-		local p = fromFlat * (1 - t) + toFlat * t + up * height
-		local hit = camera:castRay(p, p - up * reach)
-		if hit.successful then
-			local d = (hit.position - p):length()
-			if best == nil or d < best then best = d end
-		end
-	end
-	if best == nil then return 0 end
-	return best + HITBOX + EXTRA_ROOM
-end
-
-local function pathBack(flat, fromH, toH, back, up)
-	local dH = toH - fromH
-	local span = math.abs(dH)
-	local step = HITBOX * 0.25
-	local n = 1
-	if span > step then n = math.floor(span / step) end
-	local reach = HITBOX * 3
-	local best = nil
-	for i = 0, n do
-		local t = (n == 0) and 0 or (i / n)
-		local p = flat + up * (fromH + dH * t)
-		local hit = camera:castRay(p, p + back * reach)
-		if hit.successful then
-			local d = (hit.position - p):length()
-			if best == nil or d < best then best = d end
-		end
-	end
-	if best == nil then return 0 end
-	return best + HITBOX + EXTRA_ROOM
 end
 
 local function hopPos(dt)
@@ -500,34 +440,6 @@ local function hopPos(dt)
 		vertFirst = goingDown
 	else
 		vertFirst = goingUp
-	end
-	if (not hopDropDone) and (goingDown or hopBelow) then
-		local xH = fromH
-		if vertFirst and goingDown then xH = toH end
-		local drop = pathDrop(fromFlat, toFlat, xH, up)
-		if drop > 0 then
-			hopFrom = hopFrom - up * drop
-			hopTo = hopTo - up * drop
-			fromH -= drop
-			toH -= drop
-		end
-		hopDropDone = true
-	end
-	if (not hopBackDone) and (goingDown or goingUp) then
-		local xDelta = toFlat - fromFlat
-		if xDelta:length() > 0.01 then
-			local back = -(xDelta:getSafeNormal())
-			local yFlat = fromFlat
-			if (not vertFirst) then yFlat = toFlat end
-			local backMove = pathBack(yFlat, fromH, toH, back, up)
-			if backMove > 0 then
-				hopFrom = hopFrom + back * backMove
-				hopTo = hopTo + back * backMove
-				fromFlat = fromFlat + back * backMove
-				toFlat = toFlat + back * backMove
-			end
-		end
-		hopBackDone = true
 	end
 	if (not goingDown) and (not goingUp) then
 		hopWait += dt
