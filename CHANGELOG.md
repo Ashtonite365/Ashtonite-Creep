@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.3.0
+
+Added:
+- Click-to-hide in Freecam: left-click a surface to raycast from the mouse. If the surface is a two-sided wall, the GUI shows
+  "two-sided wall, won't be able to see through it" for a few seconds. Otherwise Creep hops to hide just behind the wall at
+  the hit point, offset past the camera's size so it stays concealed
+- Two-sided check reuses the existing see-through pattern: start barely past the hit point and shoot one ray back toward it
+- 1.2.0 moved to `archive/1.2.0/`
+
 ## 1.2.0
 
 Changed:

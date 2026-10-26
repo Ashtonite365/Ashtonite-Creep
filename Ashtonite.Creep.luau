@@ -1,7 +1,7 @@
 -- SPDX-License-Identifier: GPL-3.0-only
 -- Copyright (c) 2026 Ashtonite (Ashtonite365)
 -- @name Ashtonite.Creep
--- @version 1.2.0
+-- @version 1.3.0
 -- @author Ashtonite365
 -- @credits Developed with AI assistance (Grok Bot agents)
 -- Unofficial community spectator camera script for Orion Drift.
@@ -81,6 +81,13 @@ local hopWait = 0
 local hopBelow = true
 local hopDropDone = false
 local hopBackDone = false
+local clickHide = cfg("clickHide", true)
+local clickWas = false
+local clickHop = false
+local guiHotLeft = 0
+local clickStatus = ""
+local clickStatusLeft = 0
+local CLICK_STATUS_TIME = 3
 
 camera.positionSmoothing = 0
 camera.rotationSmoothing = 0
@@ -606,8 +613,69 @@ local function applyLook(pos, targetPos, up, dt)
 	end
 end
 
-local function tickFreecam(dt, up)
+-- Click-to-hide (freecam). Left click edge, own memory like Core Drone keyEdge.
+local function clickEdge()
+	local held = Input.getKey(Input.Key.LeftMouseButton) and true or false
+	local edge = held and not clickWas
+	clickWas = held
+	return edge
+end
+
+local function setClickStatus(msg)
+	clickStatus = msg
+	clickStatusLeft = CLICK_STATUS_TIME
+end
+
+-- Gui has no WantCaptureMouse / IsWindowHovered, only isItemHovered (last item).
+-- onGui wraps each widget in hot(); a hovered widget blocks clicks for 0.2 s.
+local function hot(v)
+	if Gui.isItemHovered() then guiHotLeft = 0.2 end
+	return v
+end
+
+-- Mouse ray hit P with normal N. Two-sided test is seeThrough: start 2 past P
+-- along -N (behind the face), shoot one ray back through P. Hit = back face.
+-- One-sided: hop to P - N * (HITBOX + EXTRA_ROOM), just past the camera size.
+local function tryClickHide()
+	local hit = camera:castRayFromMouse()
+	if not hit.successful then
+		setClickStatus("click: no hit")
+		return
+	end
+	local into = -(hit.normal:getSafeNormal())
+	if into:length() < 0.01 then
+		into = (hit.position - camera.position):getSafeNormal()
+	end
+	if into:length() < 0.01 then
+		setClickStatus("click: no surface normal")
+		return
+	end
+	if not seeThrough(hit.position, into) then
+		setClickStatus("two-sided wall, won't be able to see through it")
+		WorldDraw.drawPoint(hit.position, 1, 0.1, 0.1, 14, CLICK_STATUS_TIME)
+		WorldDraw.drawLine(hit.position, hit.position - into * 60, 1, 0.1, 0.1, 2, CLICK_STATUS_TIME)
+		return
+	end
+	local hide = hit.position + into * (HITBOX + EXTRA_ROOM)
+	startHop(hide, camera.position)
+	hopDropDone = true
+	hopBackDone = true
+	clickHop = true
+	setClickStatus("hiding behind wall")
+	WorldDraw.drawPoint(hit.position, 0.1, 1, 0.1, 10, 1)
+end
+
+local function tickFreecam(dt, up, clicked)
 	mode = "Freecam"
+	if clicked and clickHide and guiHotLeft <= 0 then
+		tryClickHide()
+	end
+	if clickHop then
+		camera.position = hopPos(dt) or camera.position
+		if hopPhase >= 3 then clickHop = false end
+		applyMouseLook(dt, up)
+		return
+	end
 	local sprint = Input.getKey(Input.Key.LeftShift) and 3 or 1
 	local slow = Input.getKey(Input.Key.LeftControl) and 0.25 or 1
 	local spd = moveSpeed * sprint * slow
@@ -684,11 +752,15 @@ function tick(dt)
 	camera.hideNearestHead = false
 	camera.showNameTags = showTags
 
+	if clickStatusLeft > 0 then clickStatusLeft -= dt end
+	if guiHotLeft > 0 then guiHotLeft -= dt end
+	local clicked = clickEdge()
 	local up = upVec()
 	if freecamOverride or not creeping then
-		tickFreecam(dt, up)
+		tickFreecam(dt, up, clicked)
 		return
 	end
+	clickHop = false
 	freeEuler = nil
 
 	local player = resolvePlayer(targetRef)
@@ -781,23 +853,26 @@ function onGui()
 	Gui.text(string.format("Pos  %.1f  %.1f  %.1f", px, py, pz))
 	Gui.text(string.format("Rot  %.1f  %.1f  %.1f", ex, ey, ez))
 	Gui.text("Priority: " .. (prioritizeWalls and "walls" or "floor or ceiling"))
+	if clickStatusLeft > 0 and clickStatus ~= "" then
+		Gui.text("Click: " .. clickStatus)
+	end
 	Gui.separator()
 	if Gui.beginTabBar("CreepTabs") then
-		if Gui.beginTabItem("Target") then
-			searchFilter = Gui.inputText("Search", searchFilter)
+		if hot(Gui.beginTabItem("Target")) then
+			searchFilter = hot(Gui.inputText("Search", searchFilter))
 			local players = getAllPlayers()
 			for i = 1, #players do
 				local p = players[i]
 				local n = p.name or "?"
 				if nameMatch(n, searchFilter) then
 					local mark = (targetRef and targetRef.playerId == p.playerId) and " [sel]" or ""
-					if Gui.selectable(n .. mark, targetRef ~= nil and targetRef.playerId == p.playerId) then
+					if hot(Gui.selectable(n .. mark, targetRef ~= nil and targetRef.playerId == p.playerId)) then
 						targetRef = p
 						targetName = n
 					end
 				end
 			end
-			if Gui.button("Begin creep") then
+			if hot(Gui.button("Begin creep")) then
 				if targetRef then
 					creeping = true
 					freecamOverride = false
@@ -808,54 +883,56 @@ function onGui()
 				end
 			end
 			Gui.sameLine()
-			if Gui.button("Stop creep") then
+			if hot(Gui.button("Stop creep")) then
 				creeping = false
 				mode = "Idle"
 			end
 			Gui.endTabItem()
 		end
-		if Gui.beginTabItem("Perch") then
-			perchFollow = Gui.checkbox("Follow tracked player", perchFollow)
+		if hot(Gui.beginTabItem("Perch")) then
+			perchFollow = hot(Gui.checkbox("Follow tracked player", perchFollow))
 			if prioritizeWalls then
-				if Gui.button("Prioritize walls") then prioritizeWalls = false end
+				if hot(Gui.button("Prioritize walls")) then prioritizeWalls = false end
 			else
-				if Gui.button("Prioritize floor or ceiling") then prioritizeWalls = true end
+				if hot(Gui.button("Prioritize floor or ceiling")) then prioritizeWalls = true end
 			end
-			maxRange = Gui.sliderFloat("Max range", maxRange, 100, 3000)
+			maxRange = hot(Gui.sliderFloat("Max range", maxRange, 100, 3000))
 			Gui.separator()
-			useExclusions = Gui.checkbox("Use exclusions", useExclusions)
+			useExclusions = hot(Gui.checkbox("Use exclusions", useExclusions))
 			Gui.text("Driftball see-through exclusions")
 			for i = 1, #EXCLUSIONS do
 				local e = EXCLUSIONS[i]
-				e.enabled = Gui.checkbox(e.name, e.enabled)
+				e.enabled = hot(Gui.checkbox(e.name, e.enabled))
 			end
 			Gui.endTabItem()
 		end
-		if Gui.beginTabItem("3rd person") then
-			onlyThird = Gui.checkbox("Only 3rd person", onlyThird)
-			noThird = Gui.checkbox("No 3rd person", noThird)
+		if hot(Gui.beginTabItem("3rd person")) then
+			onlyThird = hot(Gui.checkbox("Only 3rd person", onlyThird))
+			noThird = hot(Gui.checkbox("No 3rd person", noThird))
 			Gui.text("  Could cause lag on low end devices")
-			orbitMul = Gui.sliderFloat("Orbit rate (x head yaw)", orbitMul, 0.5, 4)
-			safeCone = Gui.sliderFloat("Safe cone", safeCone, 0, 1)
-			minFollow = Gui.sliderFloat("Min follow distance", minFollow, 60, 800)
-			backScale = Gui.sliderFloat("Back-away scale", backScale, 0, 0.4)
-			backLead = Gui.sliderFloat("Back-away lead", backLead, 0, 0.5)
+			orbitMul = hot(Gui.sliderFloat("Orbit rate (x head yaw)", orbitMul, 0.5, 4))
+			safeCone = hot(Gui.sliderFloat("Safe cone", safeCone, 0, 1))
+			minFollow = hot(Gui.sliderFloat("Min follow distance", minFollow, 60, 800))
+			backScale = hot(Gui.sliderFloat("Back-away scale", backScale, 0, 0.4))
+			backLead = hot(Gui.sliderFloat("Back-away lead", backLead, 0, 0.5))
 			Gui.endTabItem()
 		end
-		if Gui.beginTabItem("Freecam") then
-			freecamOverride = Gui.checkbox("Freecam override", freecamOverride)
-			alignGravity = Gui.checkbox("Align to gravity", alignGravity)
-			mouseSens = Gui.sliderFloat("Mouse sensitivity", mouseSens, 0.2, 8)
-			invertMouseX = Gui.checkbox("Invert mouse X", invertMouseX)
-			invertMouseY = Gui.checkbox("Invert mouse Y", invertMouseY)
-			moveSpeed = Gui.sliderFloat("Move speed", moveSpeed, 200, 8000)
-			vertSpeed = Gui.sliderFloat("Q/E speed", vertSpeed, 200, 8000)
+		if hot(Gui.beginTabItem("Freecam")) then
+			freecamOverride = hot(Gui.checkbox("Freecam override", freecamOverride))
+			alignGravity = hot(Gui.checkbox("Align to gravity", alignGravity))
+			mouseSens = hot(Gui.sliderFloat("Mouse sensitivity", mouseSens, 0.2, 8))
+			invertMouseX = hot(Gui.checkbox("Invert mouse X", invertMouseX))
+			invertMouseY = hot(Gui.checkbox("Invert mouse Y", invertMouseY))
+			moveSpeed = hot(Gui.sliderFloat("Move speed", moveSpeed, 200, 8000))
+			vertSpeed = hot(Gui.sliderFloat("Q/E speed", vertSpeed, 200, 8000))
+			clickHide = hot(Gui.checkbox("Click to hide", clickHide))
 			Gui.text("WASD move  |  Q/E up down  |  Shift sprint  |  Ctrl slow")
+			Gui.text("Left click a one-sided wall to hide behind it")
 			Gui.endTabItem()
 		end
-		if Gui.beginTabItem("Camera") then
-			fov = Gui.sliderFloat("Field of view", fov, 40, 150)
-			showTags = Gui.checkbox("Show nametags", showTags)
+		if hot(Gui.beginTabItem("Camera")) then
+			fov = hot(Gui.sliderFloat("Field of view", fov, 40, 150))
+			showTags = hot(Gui.checkbox("Show nametags", showTags))
 			Gui.endTabItem()
 		end
 		Gui.endTabBar()
