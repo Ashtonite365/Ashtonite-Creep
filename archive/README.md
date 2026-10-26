@@ -4,6 +4,7 @@ Older Ashtonite.Creep builds. The current release is the file in the repo root.
 
 - `1.0.0/` first public build
 - `1.1.0/` 32 gravity-aligned search rays, cage traces through the future camera point, No 3rd person toggle
+- `1.2.0/` hop path checks, GPL-3.0-only licence, credits and disclaimer
 
 All archived versions are Ashtonite (Ashtonite365)'s own work and are covered by the repository's
 [GPL-3.0-only licence](../LICENSE) and [NOTICE](../NOTICE).

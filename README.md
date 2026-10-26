@@ -1,12 +1,12 @@
 # Ashtonite.Creep
 
-Unofficial community Orion Drift spectator camera. Hides behind one-sided geo near a tracked player. Falls back to 3rd person when no valid perch exists.
+Unofficial community Orion Drift spectator camera. Hides behind one-sided geo near a tracked player. Falls back to 3rd person when no valid perch exists. In Freecam, left-click a wall to hide behind it.
 
-**Version 1.2.0**
+**Version 1.3.0**
 
 > **Disclaimer:** This product is not affiliated with Another Axiom Inc. or its videogames Gorilla Tag and Orion Drift and is not endorsed or otherwise sponsored by Another Axiom. Portions of the materials contained herein are property of Another Axiom. ©2025 Another Axiom Inc.
 
-## 1. Download (current version: 1.2.0)
+## 1. Download (current version: 1.3.0)
 
 [Download Ashtonite.Creep.luau](https://github.com/Ashtonite365/Ashtonite-Creep/raw/main/Ashtonite.Creep.luau)
 
@@ -14,7 +14,7 @@ If the browser opens the file instead of saving it, right-click the link and cho
 
 ## Install
 
-1. Download `Ashtonite.Creep.luau` (version 1.2.0).
+1. Download `Ashtonite.Creep.luau` (version 1.3.0).
 2. Drop it in your Orion Drift spectator scripts folder.
 3. Reload cameras (F2) and activate **Ashtonite.Creep**.
 
@@ -24,6 +24,10 @@ If the browser opens the file instead of saving it, right-click the link and cho
 2. Perch mode hides in nearby one-sided floors or walls.
 3. If nothing valid is in range, it uses 3rd person behind them (unless No 3rd person is on).
 4. Freecam override: WASD move, Q/E up down, Shift sprint, Ctrl slow.
+5. Click to hide (Freecam only, on by default, toggle in the Freecam tab): left-click a wall. Creep raycasts from the mouse
+   to the surface you clicked. If it's a two-sided wall, the panel shows "two-sided wall, won't be able to see through
+   it" for a few seconds and marks the spot in red. Otherwise Creep moves to just behind the wall at that point, a little
+   past the camera's size so it stays hidden. Clicks on the settings panel are ignored.
 
 ## Changelog
 

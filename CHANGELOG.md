@@ -9,6 +9,9 @@ Added:
 - Two-sided check reuses the existing see-through pattern: start barely past the hit point and shoot one ray back toward it
 - 1.2.0 moved to `archive/1.2.0/`
 
+Docs:
+- README updated for 1.3.0 and click-to-hide
+
 ## 1.2.0
 
 Changed:
